@@ -27,6 +27,7 @@ RUN npm run build -w packages/types \
     && npm run build -w packages/queue \
     && npm run build -w packages/crypto \
     && npm run build -w packages/database \
+    && npm run build -w packages/database \
     && npm run build -w packages/utils \
     && npm run build -w apps/dispatcher
 
