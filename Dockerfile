@@ -4,7 +4,7 @@ RUN apk add --no-cache dumb-init
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 FROM base AS deps
-COPY package.json package-lock.json turbo.json ./
+COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/dispatcher/package.json ./apps/dispatcher/
 COPY packages/config/package.json ./packages/config/
 COPY packages/database/package.json ./packages/database/
