@@ -1,47 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
-    "admin": {
-      "root": "apps/admin",
-      "framework": "nextjs"
-    },
-    "api": {
-      "root": "apps/api",
-      "framework": "fastify"
-    },
-    "dashboard": {
-      "root": "apps/dashboard",
-      "framework": "nextjs"
-    },
-    "dispatcher": {
-      "root": ".",
-      "runtime": "container"
-    },
-    "landing": {
-      "root": "apps/landing",
-      "framework": "nextjs"
-    },
-    "worker": {
-      "root": "apps/worker",
-      "runtime": "container"
-    }
+    "admin": { "root": "apps/admin", "framework": "nextjs" },
+    "api": { "root": "apps/api", "framework": "fastify" },
+    "dashboard": { "root": "apps/dashboard", "framework": "nextjs" },
+    "dispatcher": { "root": ".", "runtime": "container", "target": "production-dispatcher" },
+    "landing": { "root": "apps/landing", "framework": "nextjs" },
+    "worker": { "root": ".", "runtime": "container", "target": "production-worker" }
   },
   "rewrites": [
-    {
-      "source": "/dashboard/(.*)",
-      "destination": { "service": "dashboard" }
-    },
-    {
-      "source": "/admin/(.*)",
-      "destination": { "service": "admin" }
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": { "service": "api" }
-    },
-    {
-      "source": "/(.*)",
-      "destination": { "service": "landing" }
-    }
+    { "source": "/dashboard/(.*)", "destination": { "service": "dashboard" } },
+    { "source": "/admin/(.*)", "destination": { "service": "admin" } },
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "landing" } }
   ]
 }
