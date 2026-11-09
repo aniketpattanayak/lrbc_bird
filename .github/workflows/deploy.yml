@@ -1,0 +1,180 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main      # → Production
+      - staging   # → Staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/wsaas
+
+jobs:
+  # ─── Determine Environment ────────────────────────────────────────────────
+  setup:
+    name: Setup Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      image_tag: ${{ steps.env.outputs.image_tag }}
+    steps:
+      - id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+          echo "image_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  # ─── Build Docker Images ──────────────────────────────────────────────────
+  build:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        app: [api, worker, dispatcher, dashboard, admin, landing]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.app }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ needs.setup.outputs.image_tag }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.app }}:${{ needs.setup.outputs.environment }}-latest
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          build-args: |
+            NODE_ENV=${{ needs.setup.outputs.environment }}
+
+  # ─── Run Database Migrations ─────────────────────────────────────────────
+  migrate:
+    name: Run Migrations
+    runs-on: ubuntu-latest
+    needs: [setup, build]
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - name: Run migrations on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/wsaas
+            IMAGE_TAG=${{ needs.setup.outputs.image_tag }} \
+            docker compose -f docker-compose.prod.yml run --rm \
+              -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+              api npm run db:migrate:deploy
+            echo "✅ Migrations complete"
+
+  # ─── Deploy to Staging ────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [setup, migrate]
+    if: needs.setup.outputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.app.yourdomain.com
+    steps:
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/wsaas
+
+            # Pull new images
+            export IMAGE_TAG=${{ needs.setup.outputs.image_tag }}
+            docker compose -f docker-compose.prod.yml pull
+
+            # Rolling restart: API first (keeps workers running)
+            docker compose -f docker-compose.prod.yml up -d --no-deps api
+            sleep 10
+
+            # Then update workers (they drain existing sessions gracefully)
+            docker compose -f docker-compose.prod.yml up -d --no-deps worker
+            sleep 5
+
+            # Then dispatcher and dashboard
+            docker compose -f docker-compose.prod.yml up -d --no-deps dispatcher dashboard admin landing
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "✅ Staging deployment complete: ${{ needs.setup.outputs.image_tag }}"
+
+  # ─── Deploy to Production ────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [setup, migrate]
+    if: needs.setup.outputs.environment == 'production'
+    environment:
+      name: production
+      url: https://app.yourdomain.com
+    steps:
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/wsaas
+
+            # Pull new images
+            export IMAGE_TAG=${{ needs.setup.outputs.image_tag }}
+            docker compose -f docker-compose.prod.yml pull
+
+            # Zero-downtime deployment sequence:
+            # 1. API — rolling restart (Nginx keeps connections alive)
+            docker compose -f docker-compose.prod.yml up -d --no-deps api
+            sleep 15
+            # Verify API is healthy before continuing
+            curl -f http://localhost:3001/health || (echo "API health check failed!" && exit 1)
+
+            # 2. Workers — graceful drain then restart
+            # Workers will stop accepting new jobs, finish current ones, then restart
+            docker compose -f docker-compose.prod.yml up -d --no-deps worker
+            sleep 10
+
+            # 3. Dispatcher
+            docker compose -f docker-compose.prod.yml up -d --no-deps dispatcher
+            sleep 5
+
+            # 4. Dashboard and admin (stateless, safe to restart immediately)
+            docker compose -f docker-compose.prod.yml up -d --no-deps dashboard admin landing
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "✅ Production deployment complete: ${{ needs.setup.outputs.image_tag }}"
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          # Add Slack/Discord notification here
+          echo "Deployment status: ${{ job.status }}"

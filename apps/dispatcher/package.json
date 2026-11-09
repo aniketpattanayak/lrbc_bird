@@ -1,0 +1,34 @@
+{
+  "name": "@wsaas/dispatcher",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/dispatcher.js",
+  "scripts": {
+    "dev": "tsx watch src/dispatcher.ts",
+    "build": "tsc",
+    "start": "node dist/dispatcher.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sentry/node": "^7.99.0",
+    "@wsaas/config": "*",
+    "@wsaas/database": "*",
+    "@wsaas/logger": "*",
+    "@wsaas/queue": "*",
+    "@wsaas/redis": "*",
+    "@wsaas/types": "*",
+    "@wsaas/utils": "*",
+    "bullmq": "^5.1.6",
+    "ioredis": "^5.3.2",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  }
+}

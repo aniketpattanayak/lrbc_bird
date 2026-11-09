@@ -1,0 +1,853 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// WhatsApp SaaS Platform — Complete Prisma Schema
+// ═══════════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  UNVERIFIED
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  DELETED
+}
+
+enum WhatsAppMode {
+  UNOFFICIAL
+  OFFICIAL
+}
+
+
+enum UserRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  UNPAID
+  INCOMPLETE
+}
+
+enum InstanceStatus {
+  INITIALIZING
+  QR_PENDING
+  CONNECTING
+  CONNECTED
+  DISCONNECTED
+  RECONNECTING
+  BANNED
+  LOGGED_OUT
+  DELETED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  STICKER
+  BUTTONS
+  LIST
+  REACTION
+  POLL
+  TEMPLATE
+  UNKNOWN
+}
+
+enum MessageStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  DELETED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  DEAD_LETTER
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum ApiKeyEnvironment {
+  LIVE
+  TEST
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  SUPPORT
+  BILLING_ADMIN
+  READ_ONLY
+}
+
+enum WalletTransactionType {
+  TOPUP
+  MESSAGE_CHARGE
+  REFUND
+  ADJUSTMENT
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// ─── TENANT & USER MANAGEMENT ─────────────────────────────────────────────────
+
+model Tenant {
+  id               String       @id @default(uuid())
+  name             String
+  email            String       @unique
+  companyName      String?
+  timezone         String       @default("UTC")
+  countryCode      String?
+  status           TenantStatus @default(UNVERIFIED)
+  whatsappMode     WhatsAppMode?
+  modeLockedAt     DateTime?
+  trialEndsAt      DateTime?
+  stripeCustomerId String?      @unique
+  currentPlanId    String?
+  metadata         Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  // Relations
+  plan             Plan?              @relation(fields: [currentPlanId], references: [id])
+  users            User[]
+  instances        Instance[]
+  apiKeys          ApiKey[]
+  subscriptions    Subscription[]
+  invoices         Invoice[]
+  paymentMethods   PaymentMethod[]
+  usageRecords     UsageRecord[]
+  overageCharges   OverageCharge[]
+  teamInvites      TeamInvite[]
+  webhookEvents    WebhookEvent[]
+  messages         Message[]
+  mediaFiles       MediaFile[]
+  notifications    Notification[]
+  supportTickets   SupportTicket[]
+  rateLimitEvents  RateLimitEvent[]
+  wallet           Wallet?
+
+  @@index([email])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── WALLET (pay-as-you-go balance for Meta per-message costs) ────────────────
+
+model Wallet {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique
+  balancePaise  BigInt   @default(0) // balance stored in paise (1 INR = 100 paise), avoids float rounding
+  currency      String   @default("INR")
+  lowBalanceThresholdPaise BigInt @default(10000) // ₹100 default low-balance alert threshold
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  transactions  WalletTransaction[]
+
+  @@index([tenantId])
+}
+
+model WalletTransaction {
+  id                String                    @id @default(uuid())
+  walletId          String
+  tenantId          String
+  type              WalletTransactionType
+  status            WalletTransactionStatus   @default(PENDING)
+  amountPaise       BigInt                    // positive for TOPUP/REFUND/credit ADJUSTMENT, negative for MESSAGE_CHARGE/debit ADJUSTMENT
+  balanceAfterPaise BigInt?                   // snapshot of wallet balance after this txn was applied (set on SUCCESS)
+  description       String?
+  razorpayOrderId   String?                   @unique
+  razorpayPaymentId String?                   @unique
+  razorpaySignature String?
+  messageId         String?                   // set for MESSAGE_CHARGE txns — the Message this charge paid for
+  metadata          Json?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([tenantId])
+  @@index([walletId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([messageId])
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  tenantId              String
+  email                 String    @unique
+  passwordHash          String?
+  role                  UserRole  @default(DEVELOPER)
+  firstName             String
+  lastName              String
+  avatarUrl             String?
+  isSuperAdmin          Boolean   @default(false)
+  emailVerified         Boolean   @default(false)
+  emailVerifiedAt       DateTime?
+  twoFactorEnabled      Boolean   @default(false)
+  twoFactorSecret       String?   // Encrypted TOTP secret
+  twoFactorBackupCodes  String[]  // Hashed backup codes
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  failedLoginCount      Int       @default(0)
+  lockedUntil           DateTime?
+  googleId              String?   @unique
+  githubId              String?   @unique
+  notificationPrefs     Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  // Relations
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  sessions    UserSession[]
+  sentInvites TeamInvite[] @relation("InvitedBy")
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model UserSession {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String    @unique
+  deviceInfo       Json      // { browser, os, device, ip }
+  ipAddress        String
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user             User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([expiresAt])
+}
+
+model TeamInvite {
+  id           String    @id @default(uuid())
+  tenantId     String
+  invitedById  String
+  email        String
+  role         UserRole
+  tokenHash    String    @unique
+  acceptedAt   DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  invitedBy    User      @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@index([tenantId])
+  @@index([tokenHash])
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([userId])
+}
+
+// ─── PLANS & BILLING ──────────────────────────────────────────────────────────
+
+model Plan {
+  id                   String   @id @default(uuid())
+  name                 String   @unique // 'trial' | 'starter' | 'business' | 'enterprise'
+  displayName          String
+  description          String?
+  priceMonthlyUsdCents Int      @default(0)
+  priceYearlyUsdCents  Int      @default(0)
+  stripePriceIdMonthly String?
+  stripePriceIdYearly  String?
+  maxInstances         Int
+  maxMessagesPerMonth  Int?     // null = unlimited
+  maxApiCallsPerMinute Int      @default(60)
+  messageRetentionDays Int      @default(7)
+  maxTeamMembers       Int      @default(1)
+  maxWebhookPerInstance Int     @default(1)
+  storageGb            Float    @default(1)
+  features             Json     // PlanFeatures object
+  isActive             Boolean  @default(true)
+  isPublic             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenants              Tenant[]
+  subscriptions        Subscription[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  tenantId             String
+  planId               String
+  stripeSubscriptionId String             @unique
+  status               SubscriptionStatus
+  billingCycle         BillingCycle
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelledAt          DateTime?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenant               Tenant             @relation(fields: [tenantId], references: [id])
+  plan                 Plan               @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+}
+
+model Invoice {
+  id               String    @id @default(uuid())
+  tenantId         String
+  stripeInvoiceId  String    @unique
+  amountCents      Int
+  currency         String    @default("usd")
+  status           String    // Stripe invoice status
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  paidAt           DateTime?
+  invoicePdfUrl    String?
+  hostedInvoiceUrl String?
+  lineItems        Json?
+  createdAt        DateTime  @default(now())
+
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([stripeInvoiceId])
+}
+
+model PaymentMethod {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  stripePaymentMethodId String   @unique
+  type                  String   // 'card' | 'bank_account'
+  lastFour              String?
+  brand                 String?
+  expMonth              Int?
+  expYear               Int?
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model OverageCharge {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  subscriptionId      String
+  periodStart         DateTime
+  periodEnd           DateTime
+  messagesOverLimit   Int
+  amountCents         Int
+  stripeInvoiceItemId String?
+  invoicedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ─── USAGE TRACKING ───────────────────────────────────────────────────────────
+
+model UsageRecord {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  instanceId         String?
+  date               DateTime @db.Date
+  messagesSent       Int      @default(0)
+  messagesReceived   Int      @default(0)
+  mediaSentBytes     BigInt   @default(0)
+  mediaReceivedBytes BigInt   @default(0)
+  apiCalls           Int      @default(0)
+  webhookDeliveries  Int      @default(0)
+  webhookFailures    Int      @default(0)
+  uniqueRecipients   Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, instanceId, date])
+  @@index([tenantId, date])
+  @@index([date])
+}
+
+// ─── API KEYS ─────────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id          String            @id @default(uuid())
+  tenantId    String
+  name        String
+  keyHash     String            @unique  // BLAKE3 hash — never store plaintext
+  keyPrefix   String            // First 12 chars for display: "wapi_live_a8"
+  environment ApiKeyEnvironment @default(LIVE)
+  permissions String[]
+  ipWhitelist String[]          // CIDR notation — empty = allow all
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  usageCount  BigInt            @default(0)
+  revokedAt   DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([keyHash])
+}
+
+// ─── WHATSAPP INSTANCES ───────────────────────────────────────────────────────
+
+model Instance {
+  id                   String         @id @default(uuid())
+  tenantId             String
+  name                 String
+  description          String?
+  phoneNumber          String?        // Set after first connection
+  countryCode          String?
+  displayName          String?
+  profilePicUrl        String?
+  status               InstanceStatus @default(INITIALIZING)
+  workerId             String?
+  proxyUrl             String?        // Encrypted — contains credentials
+  proxyType            String?        // 'socks5' | 'http'
+  autoReconnect        Boolean        @default(true)
+  maxReconnectAttempts Int            @default(5)
+  reconnectCount       Int            @default(0)
+  messageDelayMs       Int            @default(1000)
+  messageDelayJitter   Int            @default(300)
+  connectedAt          DateTime?
+  lastSeenAt           DateTime?
+  disconnectedAt       DateTime?
+  banDetectedAt        DateTime?
+  lastQrAt             DateTime?
+  metadata             Json?
+  notes                String?        // Admin notes
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  deletedAt            DateTime?
+
+  // Relations
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id])
+  worker            Worker?                  @relation(fields: [workerId], references: [id])
+  credentials       InstanceCredentials?
+  qrEvents          InstanceQrEvent[]
+  connectionHistory InstanceConnectionEvent[]
+  webhookConfig     WebhookConfig?
+  messages          Message[]
+  mediaFiles        MediaFile[]
+  webhookEvents     WebhookEvent[]
+
+  @@index([tenantId])
+  @@index([workerId])
+  @@index([status])
+  @@index([phoneNumber])
+  @@index([createdAt])
+}
+
+model InstanceCredentials {
+  id                   String   @id @default(uuid())
+  instanceId           String   @unique
+  credentialsEncrypted Bytes    // AES-256-GCM encrypted Baileys auth state
+  encryptionKeyId      String   // Tracks which encryption key version was used
+  credentialsVersion   Int      @default(1)
+  lastUpdatedAt        DateTime @default(now())
+
+  instance             Instance @relation(fields: [instanceId], references: [id])
+}
+
+model InstanceQrEvent {
+  id          String    @id @default(uuid())
+  instanceId  String
+  qrData      String    @db.Text  // Base64 QR code data
+  generatedAt DateTime  @default(now())
+  scannedAt   DateTime?
+  expiredAt   DateTime
+
+  instance    Instance  @relation(fields: [instanceId], references: [id])
+
+  @@index([instanceId])
+  @@index([generatedAt])
+}
+
+model InstanceConnectionEvent {
+  id         String   @id @default(uuid())
+  instanceId String
+  event      String   // connected | disconnected | banned | qr_generated | reconnect_attempt
+  reason     String?
+  errorCode  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  instance   Instance @relation(fields: [instanceId], references: [id])
+
+  @@index([instanceId, createdAt])
+}
+
+// ─── MESSAGES ─────────────────────────────────────────────────────────────────
+
+model Message {
+  id                String           @id @default(uuid())
+  tenantId          String
+  instanceId        String
+  whatsappMessageId String?          // WA's own message ID
+  direction         MessageDirection
+  type              MessageType
+  status            MessageStatus    @default(QUEUED)
+  toNumber          String?          // E.164 format
+  fromNumber        String?
+  content           Json             // Typed per MessageType
+  mediaId           String?
+  quotedMessageId   String?
+  isGroupMessage    Boolean          @default(false)
+  groupId           String?
+  batchId           String?          // Links to BulkBatch
+  retryCount        Int              @default(0)
+  errorCode         String?
+  errorMessage      String?
+  queuedAt          DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime         @default(now())
+
+  // Relations
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  instance Instance   @relation(fields: [instanceId], references: [id])
+  media    MediaFile? @relation(fields: [mediaId], references: [id])
+
+  @@index([instanceId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([whatsappMessageId])
+  @@index([batchId])
+  @@index([toNumber])
+  @@index([fromNumber])
+  @@index([status])
+}
+
+model BulkBatch {
+  id            String    @id @default(uuid())
+  tenantId      String
+  instanceId    String
+  totalMessages Int
+  sentCount     Int       @default(0)
+  failedCount   Int       @default(0)
+  pendingCount  Int
+  status        String    @default("processing")
+  delayMs       Int       @default(1000)
+  stopOnError   Boolean   @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([instanceId])
+  @@index([status])
+}
+
+model MediaFile {
+  id               String    @id @default(uuid())
+  tenantId         String
+  instanceId       String?
+  type             String    // image | video | audio | document | sticker
+  originalFilename String?
+  mimeType         String
+  sizeBytes        BigInt
+  storageKey       String    @unique  // R2 object key
+  storageUrl       String             // CDN URL
+  isPublic         Boolean   @default(false)
+  expiresAt        DateTime?          // Auto-delete based on plan retention
+  createdAt        DateTime  @default(now())
+
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  instance         Instance? @relation(fields: [instanceId], references: [id])
+  messages         Message[]
+
+  @@index([tenantId])
+  @@index([expiresAt])
+}
+
+// ─── WEBHOOKS ─────────────────────────────────────────────────────────────────
+
+model WebhookConfig {
+  id               String    @id @default(uuid())
+  instanceId       String    @unique
+  url              String
+  secretHash       String    // Hashed webhook secret
+  secretPrefix     String    // Last 4 chars for display
+  events           String[]  // WebhookEventType[]
+  isEnabled        Boolean   @default(true)
+  maxRetries       Int       @default(7)
+  timeoutSeconds   Int       @default(10)
+  customHeaders    Json?     // Additional headers to send
+  failureThreshold Int       @default(10)  // Alert after this many consecutive failures
+  consecutiveFails Int       @default(0)
+  alertSent        Boolean   @default(false)
+  lastSuccessAt    DateTime?
+  lastFailureAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  instance         Instance  @relation(fields: [instanceId], references: [id])
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  tenantId    String
+  instanceId  String
+  eventType   String    // WebhookEventType
+  payload     Json      // Full event payload
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  instance    Instance  @relation(fields: [instanceId], references: [id])
+  deliveries  WebhookDelivery[]
+
+  @@index([instanceId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model WebhookDelivery {
+  id             String                @id @default(uuid())
+  eventId        String
+  instanceId     String
+  attemptNumber  Int
+  status         WebhookDeliveryStatus @default(PENDING)
+  httpStatusCode Int?
+  responseBody   String?               @db.Text
+  errorMessage   String?
+  latencyMs      Int?
+  attemptedAt    DateTime              @default(now())
+  nextRetryAt    DateTime?
+
+  event          WebhookEvent          @relation(fields: [eventId], references: [id])
+
+  @@index([eventId])
+  @@index([instanceId])
+  @@index([nextRetryAt])
+  @@index([status])
+}
+
+// ─── WORKER MANAGEMENT ────────────────────────────────────────────────────────
+
+model Worker {
+  id              String     @id  // 'worker-1', 'worker-2', etc.
+  hostname        String
+  ipAddress       String
+  port            Int
+  status          String     @default("starting")
+  sessionCount    Int        @default(0)
+  maxSessions     Int
+  memoryUsedMb    Int        @default(0)
+  memoryLimitMb   Int
+  cpuPercent      Float      @default(0)
+  version         String
+  lastHeartbeatAt DateTime
+  startedAt       DateTime   @default(now())
+  metadata        Json?
+
+  instances       Instance[]
+
+  @@index([status])
+  @@index([lastHeartbeatAt])
+}
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+
+model AdminUser {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  role             AdminRole @default(READ_ONLY)
+  twoFactorEnabled Boolean   @default(true)
+  twoFactorSecret  String?
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  auditLogs        AdminAuditLog[]
+}
+
+model AdminAuditLog {
+  id          String    @id @default(uuid())
+  adminId     String
+  action      String    // e.g., 'suspend_tenant', 'change_plan'
+  targetType  String    // 'tenant' | 'instance' | 'worker' | 'plan'
+  targetId    String?
+  beforeState Json?
+  afterState  Json?
+  ipAddress   String
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  admin       AdminUser @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model PlatformAlert {
+  id             String        @id @default(uuid())
+  type           String        // 'worker_down' | 'high_memory' | etc.
+  severity       AlertSeverity
+  title          String
+  message        String        @db.Text
+  metadata       Json?
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([severity, createdAt])
+  @@index([resolvedAt])
+}
+
+model SystemConfig {
+  key         String   @id
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid())
+  tenantId  String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean   @default(false)
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, isRead])
+  @@index([createdAt])
+}
+
+// ─── SUPPORT ──────────────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id         String    @id @default(uuid())
+  tenantId   String
+  subject    String
+  status     String    @default("open")
+  priority   String    @default("normal")
+  category   String?
+  metadata   Json?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ─── RATE LIMIT ANALYTICS ─────────────────────────────────────────────────────
+
+model RateLimitEvent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  apiKeyId  String?
+  endpoint  String
+  limitType String
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+}

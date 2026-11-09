@@ -1,0 +1,49 @@
+{
+  "name": "whatsapp-saas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WhatsApp API Gateway SaaS Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "turbo run db:generate",
+    "db:migrate": "npm run db:migrate -w packages/database",
+    "db:migrate:dev": "npm run db:migrate:dev -w packages/database",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w packages/database",
+    "db:migrate:test": "npm run db:migrate:test -w packages/database",
+    "db:studio": "npm run db:studio -w packages/database",
+    "db:seed": "npm run db:seed -w packages/database",
+    "db:reset": "npm run db:reset -w packages/database",
+    "docker:dev": "docker compose up -d",
+    "docker:dev:down": "docker compose down",
+    "docker:dev:reset": "docker compose down -v && docker compose up -d",
+    "docker:logs": "docker compose logs -f",
+    "setup": "bash scripts/setup.sh",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\""
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "prisma": "^5.22.0",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.2.4"
+}

@@ -1,0 +1,115 @@
+groups:
+  - name: wsaas_critical
+    interval: 30s
+    rules:
+      - alert: APIDown
+        expr: up{job="wsaas-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API server is down"
+          description: "The API server has been unreachable for more than 1 minute."
+
+      - alert: WorkerDown
+        expr: |
+          (time() - wsaas_worker_last_heartbeat_timestamp_seconds) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker {{ $labels.worker_id }} is down"
+          description: "Worker has not sent a heartbeat for over 60 seconds."
+
+      - alert: APIHighErrorRate
+        expr: |
+          (
+            rate(wsaas_api_http_requests_total{status_code=~"5.."}[5m])
+            /
+            rate(wsaas_api_http_requests_total[5m])
+          ) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate above 10%"
+          description: "{{ $value | humanizePercentage }} of API requests are returning 5xx errors."
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_activity_count > 180
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value }} active DB connections (limit: 200)."
+
+  - name: wsaas_warning
+    interval: 60s
+    rules:
+      - alert: WorkerHighMemory
+        expr: |
+          wsaas_worker_memory_used_mb / wsaas_worker_memory_limit_mb > 0.80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker {{ $labels.worker_id }} memory above 80%"
+          description: "Worker memory at {{ $value | humanizePercentage }}."
+
+      - alert: MessageQueueDepthHigh
+        expr: |
+          bullmq_queue_waiting{queue="message:outbound"} > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Message outbound queue depth high"
+          description: "{{ $value }} messages waiting in queue."
+
+      - alert: WebhookFailureRateHigh
+        expr: |
+          (
+            rate(wsaas_api_http_requests_total{route=~".*/webhook.*", status_code=~"4..|5.."}[10m])
+            /
+            rate(wsaas_api_http_requests_total{route=~".*/webhook.*"}[10m])
+          ) > 0.30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook delivery failure rate above 30%"
+
+      - alert: DiskUsageHigh
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!="tmpfs"}
+            /
+            node_filesystem_size_bytes{fstype!="tmpfs"}
+          ) < 0.20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage above 80% on {{ $labels.instance }}"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining."
+
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.99,
+            rate(wsaas_api_http_request_duration_seconds_bucket[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p99 latency above 2 seconds"
+          description: "99th percentile latency: {{ $value }}s"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage above 85%"

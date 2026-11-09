@@ -1,0 +1,43 @@
+{
+  "name": "@wsaas/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/worker.js",
+  "scripts": {
+    "dev": "tsx watch src/worker.ts",
+    "build": "tsc",
+    "start": "node dist/worker.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:unit": "vitest run --reporter=verbose src",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sentry/node": "^7.99.0",
+    "@whiskeysockets/baileys": "^6.7.5",
+    "@wsaas/config": "*",
+    "@wsaas/crypto": "*",
+    "@wsaas/database": "*",
+    "@wsaas/logger": "*",
+    "@wsaas/meta-cloud-api": "*",
+    "@wsaas/queue": "*",
+    "@wsaas/redis": "*",
+    "@wsaas/types": "*",
+    "@wsaas/utils": "*",
+    "aws-sdk": "^2.1540.0",
+    "bullmq": "^5.1.6",
+    "ioredis": "^5.3.2",
+    "prom-client": "^15.1.0",
+    "qrcode": "^1.5.3",
+    "sharp": "^0.33.2",
+    "socks-proxy-agent": "^8.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  }
+}
