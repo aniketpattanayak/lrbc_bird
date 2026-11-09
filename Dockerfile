@@ -7,13 +7,14 @@ FROM base AS deps
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/dispatcher/package.json ./apps/dispatcher/
 COPY packages/config/package.json ./packages/config/
+COPY packages/crypto/package.json ./packages/crypto/
 COPY packages/database/package.json ./packages/database/
 COPY packages/logger/package.json ./packages/logger/
+COPY packages/meta-cloud-api/package.json ./packages/meta-cloud-api/
 COPY packages/queue/package.json ./packages/queue/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/types/package.json ./packages/types/
 COPY packages/utils/package.json ./packages/utils/
-COPY packages/crypto/package.json ./packages/crypto/
 RUN npm ci
 
 FROM deps AS builder
@@ -22,11 +23,11 @@ COPY packages ./packages
 RUN npx prisma generate --schema=packages/database/prisma/schema.prisma
 RUN npm run build -w packages/types \
     && npm run build -w packages/config \
+    && npm run build -w packages/crypto \
     && npm run build -w packages/logger \
     && npm run build -w packages/redis \
     && npm run build -w packages/queue \
-    && npm run build -w packages/crypto \
-    && npm run build -w packages/database \
+    && npm run build -w packages/meta-cloud-api \
     && npm run build -w packages/database \
     && npm run build -w packages/utils \
     && npm run build -w apps/dispatcher
