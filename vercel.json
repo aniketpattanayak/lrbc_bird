@@ -4,9 +4,9 @@
     "admin": { "root": "apps/admin", "framework": "nextjs" },
     "api": { "root": "apps/api", "framework": "fastify" },
     "dashboard": { "root": "apps/dashboard", "framework": "nextjs" },
-    "dispatcher": { "root": ".", "runtime": "container", "target": "production-dispatcher" },
+    "dispatcher": { "root": ".", "runtime": "container" },
     "landing": { "root": "apps/landing", "framework": "nextjs" },
-    "worker": { "root": ".", "runtime": "container", "target": "production-worker" }
+    "worker": { "root": ".", "runtime": "container" }
   },
   "rewrites": [
     { "source": "/dashboard/(.*)", "destination": { "service": "dashboard" } },

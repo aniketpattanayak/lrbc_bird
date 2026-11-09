@@ -34,26 +34,15 @@ RUN npm run build -w packages/types \
     && npm run build -w apps/dispatcher \
     && npm run build -w apps/worker
 
-FROM base AS production-dispatcher
-ENV NODE_ENV=production
-COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/apps/dispatcher/dist ./apps/dispatcher/dist
-COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-USER nodejs
-WORKDIR /app/apps/dispatcher
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/dispatcher.js"]
-
-FROM base AS production-worker
+FROM base AS production
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/apps/dispatcher/dist ./apps/dispatcher/dist
 COPY --from=builder --chown=nodejs:nodejs /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 USER nodejs
-WORKDIR /app/apps/worker
-EXPOSE 3002
+WORKDIR /app
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/worker.js"]
+CMD ["sh", "-c", "if [ \"$SERVICE\" = 'worker' ]; then node apps/worker/dist/worker.js; else node apps/dispatcher/dist/dispatcher.js; fi"]
