@@ -27,6 +27,7 @@
     "@wsaas/utils": "*",
     "aws-sdk": "^2.1540.0",
     "bullmq": "^5.1.6",
+    "dotenv": "^18.0.10",
     "ioredis": "^5.3.2",
     "prom-client": "^15.1.0",
     "qrcode": "^1.5.3",
