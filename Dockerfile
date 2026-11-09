@@ -13,6 +13,7 @@ COPY packages/queue/package.json ./packages/queue/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/types/package.json ./packages/types/
 COPY packages/utils/package.json ./packages/utils/
+COPY packages/crypto/package.json ./packages/crypto/
 RUN npm ci
 
 FROM deps AS builder
@@ -24,6 +25,7 @@ RUN npm run build -w packages/types \
     && npm run build -w packages/logger \
     && npm run build -w packages/redis \
     && npm run build -w packages/queue \
+    && npm run build -w packages/crypto \
     && npm run build -w packages/utils \
     && npm run build -w apps/dispatcher
 
