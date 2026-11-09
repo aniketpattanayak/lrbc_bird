@@ -14,8 +14,9 @@
       "framework": "nextjs"
     },
     "dispatcher": {
-      "root": "apps/dispatcher",
-      "runtime": "container"
+      "root": ".",
+      "runtime": "container",
+      "dockerfilePath": "apps/dispatcher/Dockerfile"
     },
     "landing": {
       "root": "apps/landing",
