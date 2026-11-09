@@ -23,7 +23,8 @@ const PRICE_TABLE_INR_PAISE: Record<string, Record<MetaMessageCategory, number>>
 };
 
 export function getMessageCostPaise(countryCode: string | null | undefined, category: MetaMessageCategory = 'UTILITY'): number {
-  const table = (countryCode && PRICE_TABLE_INR_PAISE[countryCode.toUpperCase()]) ?? PRICE_TABLE_INR_PAISE['DEFAULT'];
+  const key = countryCode?.toUpperCase();
+  const table = (key ? PRICE_TABLE_INR_PAISE[key] : undefined) ?? PRICE_TABLE_INR_PAISE['DEFAULT']!;
   return table[category];
 }
 
