@@ -61,7 +61,7 @@ export async function getMessagesTimeSeries(
 ) {
   const trunc = groupBy === 'day' ? 'day' : groupBy === 'week' ? 'week' : 'month';
 
-  const rows = await prisma.$queryRawUnsafe<Array<{ bucket: Date; direction: string; count: bigint }>>(
+  const rows = (await prisma.$queryRawUnsafe((
     `SELECT date_trunc($1, "createdAt") AS bucket, "direction", COUNT(*) AS count
      FROM "Message"
      WHERE "tenantId" = $2 AND "createdAt" >= $3 AND "createdAt" <= $4
@@ -71,7 +71,7 @@ export async function getMessagesTimeSeries(
     tenantId,
     from,
     to,
-  );
+  ) as Array<{ bucket: Date; direction: string; count: bigint }>;
 
   const buckets = new Map<string, { date: string; sent: number; received: number }>();
   for (const row of rows) {

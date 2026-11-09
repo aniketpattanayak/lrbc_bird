@@ -36,7 +36,7 @@ export async function creditWallet(params: {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
-  metadata?: Prisma.InputJsonValue;
+  metadata?: unknown;
 }) {
   const { tenantId, amountPaise, type, description, razorpayOrderId, razorpayPaymentId, razorpaySignature, metadata } = params;
   if (amountPaise <= 0n) throw new Error('creditWallet: amountPaise must be positive');

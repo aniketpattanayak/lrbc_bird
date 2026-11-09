@@ -217,6 +217,7 @@ export async function getInstanceQr(tenantId: string, instanceId: string) {
 
   let qrImageDataUri: string | null = null;
   try {
+    // @ts-ignore — qrcode has no type declarations installed
     const QRCode = await import('qrcode');
     qrImageDataUri = await QRCode.toDataURL(qrData, { width: 300, margin: 2 });
   } catch {

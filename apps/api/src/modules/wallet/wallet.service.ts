@@ -58,7 +58,7 @@ export async function getWalletSummary(tenantId: string) {
 }
 
 export async function getTransactionHistory(tenantId: string, query: ListTransactionsQuery) {
-  const { transactions, total, wallet } = await listWalletTransactions(tenantId, query);
+  const { transactions, total, wallet } = await listWalletTransactions(tenantId, { page: query.page ?? 1, limit: query.limit ?? 20 });
   return {
     wallet: serializeWallet(wallet),
     transactions: transactions.map(serializeTransaction),
