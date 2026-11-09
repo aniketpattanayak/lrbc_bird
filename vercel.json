@@ -29,27 +29,19 @@
   "rewrites": [
     {
       "source": "/dashboard/(.*)",
-      "destination": {
-        "service": "dashboard"
-      }
+      "destination": { "service": "dashboard" }
     },
     {
       "source": "/admin/(.*)",
-      "destination": {
-        "service": "admin"
-      }
+      "destination": { "service": "admin" }
     },
     {
       "source": "/api/(.*)",
-      "destination": {
-        "service": "api"
-      }
+      "destination": { "service": "api" }
     },
     {
       "source": "/(.*)",
-      "destination": {
-        "service": "landing"
-      }
+      "destination": { "service": "landing" }
     }
   ]
 }
