@@ -15,8 +15,7 @@
     },
     "dispatcher": {
       "root": ".",
-      "runtime": "container",
-      "dockerfilePath": "apps/dispatcher/Dockerfile"
+      "runtime": "container"
     },
     "landing": {
       "root": "apps/landing",
