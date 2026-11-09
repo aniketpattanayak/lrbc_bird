@@ -28,7 +28,6 @@ RUN npm run build -w packages/types \
     && npm run build -w packages/redis \
     && npm run build -w packages/queue \
     && npm run build -w packages/meta-cloud-api \
-    && npm run build -w packages/database \
     && npm run build -w packages/utils \
     && npm run build -w apps/dispatcher
 
