@@ -90,3 +90,4 @@ temp/
 node_modules/
 .env*
 .DS_Store
+*.png # or test-upload-image.png specifically
