@@ -1,3 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = { reactStrictMode: true };
+// cache-bust: 1
+const nextConfig = {
+  reactStrictMode: true,
+};
 export default nextConfig;
