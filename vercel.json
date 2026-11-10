@@ -1,34 +1,35 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "admin": { "root": "apps/admin", "framework": "nextjs" },
-    "api": { "root": "apps/api", "framework": "fastify" },
-    "dashboard": { "root": "apps/dashboard", "framework": "nextjs" },
-    "dispatcher": { "root": ".", "runtime": "container" },
-    "landing": { "root": "apps/landing", "framework": "nextjs" },
-    "worker": { "root": ".", "runtime": "container" }
-  },
-  "rewrites": [
-    { "source": "/api/:path*", "destination": { "service": "api" } },
-    { "source": "/login", "destination": { "service": "dashboard" } },
-    { "source": "/register", "destination": { "service": "dashboard" } },
-    { "source": "/forgot-password", "destination": { "service": "dashboard" } },
-    { "source": "/reset-password", "destination": { "service": "dashboard" } },
-    { "source": "/verify-email", "destination": { "service": "dashboard" } },
-    { "source": "/overview", "destination": { "service": "dashboard" } },
-    { "source": "/instances", "destination": { "service": "dashboard" } },
-    { "source": "/instances/:path*", "destination": { "service": "dashboard" } },
-    { "source": "/messages", "destination": { "service": "dashboard" } },
-    { "source": "/settings", "destination": { "service": "dashboard" } },
-    { "source": "/billing", "destination": { "service": "dashboard" } },
-    { "source": "/wallet", "destination": { "service": "dashboard" } },
-    { "source": "/templates", "destination": { "service": "dashboard" } },
-    { "source": "/media", "destination": { "service": "dashboard" } },
-    { "source": "/webhooks", "destination": { "service": "dashboard" } },
-    { "source": "/team", "destination": { "service": "dashboard" } },
-    { "source": "/api-keys", "destination": { "service": "dashboard" } },
-    { "source": "/usage", "destination": { "service": "dashboard" } },
-    { "source": "/onboarding", "destination": { "service": "dashboard" } },
-    { "source": "/:path*", "destination": { "service": "landing" } }
-  ]
-}
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "services": {
+      "admin": { "root": "apps/admin", "framework": "nextjs" },
+      "api": { "root": "apps/api", "framework": "fastify" },
+      "dashboard": { "root": "apps/dashboard", "framework": "nextjs" },
+      "dispatcher": { "root": ".", "runtime": "container" },
+      "landing": { "root": "apps/landing", "framework": "nextjs" },
+      "worker": { "root": ".", "runtime": "container" }
+    },
+    "rewrites": [
+      { "source": "/api/:path*", "destination": { "service": "api" } },
+      { "source": "/v1/:path*", "destination": { "service": "api" } },
+      { "source": "/login", "destination": { "service": "dashboard" } },
+      { "source": "/register", "destination": { "service": "dashboard" } },
+      { "source": "/forgot-password", "destination": { "service": "dashboard" } },
+      { "source": "/reset-password", "destination": { "service": "dashboard" } },
+      { "source": "/verify-email", "destination": { "service": "dashboard" } },
+      { "source": "/overview", "destination": { "service": "dashboard" } },
+      { "source": "/instances", "destination": { "service": "dashboard" } },
+      { "source": "/instances/:path*", "destination": { "service": "dashboard" } },
+      { "source": "/messages", "destination": { "service": "dashboard" } },
+      { "source": "/settings", "destination": { "service": "dashboard" } },
+      { "source": "/billing", "destination": { "service": "dashboard" } },
+      { "source": "/wallet", "destination": { "service": "dashboard" } },
+      { "source": "/templates", "destination": { "service": "dashboard" } },
+      { "source": "/media", "destination": { "service": "dashboard" } },
+      { "source": "/webhooks", "destination": { "service": "dashboard" } },
+      { "source": "/team", "destination": { "service": "dashboard" } },
+      { "source": "/api-keys", "destination": { "service": "dashboard" } },
+      { "source": "/usage", "destination": { "service": "dashboard" } },
+      { "source": "/onboarding", "destination": { "service": "dashboard" } },
+      { "source": "/:path*", "destination": { "service": "landing" } }
+    ]
+  }
