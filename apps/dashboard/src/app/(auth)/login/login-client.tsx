@@ -7,8 +7,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { api, ApiClientError, setAccessToken } from '@/lib/api';
+import { api, ApiClientError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import type { PublicUser, PublicTenant } from '@wsaas/types';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -22,11 +23,20 @@ const twoFaSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 type TwoFaForm = z.infer<typeof twoFaSchema>;
 
+interface LoginResponse {
+  data: {
+    accessToken: string;
+    user: PublicUser;
+    tenant: PublicTenant;
+    twoFactorRequired?: boolean;
+  };
+}
+
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/overview';
-  const { setUser } = useAuthStore();
+  const { setAuth } = useAuthStore();
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,18 +59,13 @@ function LoginPageInner() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await api.post<{ accessToken: string; user: Record<string, unknown>; twoFactorRequired?: boolean }>(
-        '/v1/auth/login',
-        data,
-        { skipAuth: true },
-      );
-      if (res.twoFactorRequired) {
+      const res = await api.post<LoginResponse>('/v1/auth/login', data, { skipAuth: true });
+      if (res.data.twoFactorRequired) {
         setPendingEmail(data.email);
         setPendingPassword(data.password);
         setTwoFaRequired(true);
       } else {
-        setAccessToken(res.accessToken);
-        setUser(res.user as Parameters<typeof setUser>[0]);
+        setAuth(res.data.user, res.data.tenant, res.data.accessToken);
         router.replace(redirectTo);
       }
     } catch (err) {
@@ -78,13 +83,12 @@ function LoginPageInner() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await api.post<{ accessToken: string; user: Record<string, unknown> }>(
+      const res = await api.post<LoginResponse>(
         '/v1/auth/login/2fa',
         { email: pendingEmail, password: pendingPassword, code: data.code },
         { skipAuth: true },
       );
-      setAccessToken(res.accessToken);
-      setUser(res.user as Parameters<typeof setUser>[0]);
+      setAuth(res.data.user, res.data.tenant, res.data.accessToken);
       router.replace(redirectTo);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -107,7 +111,9 @@ function LoginPageInner() {
         )}
         <form onSubmit={twoFaForm.handleSubmit(onTwoFaSubmit)} className="space-y-4" noValidate>
           <div>
-            <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">Authentication code</label>
+            <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
+              Authentication code
+            </label>
             <input
               {...twoFaForm.register('code')}
               id="code"
@@ -131,7 +137,11 @@ function LoginPageInner() {
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isLoading ? 'Verifying...' : 'Verify'}
           </button>
-          <button type="button" onClick={() => { setTwoFaRequired(false); setError(null); }} className="w-full text-sm text-gray-500 hover:text-gray-900 transition-colors">
+          <button
+            type="button"
+            onClick={() => { setTwoFaRequired(false); setError(null); }}
+            className="w-full text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
             Back to sign in
           </button>
         </form>
@@ -144,14 +154,18 @@ function LoginPageInner() {
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in to your account</h1>
       <p className="text-gray-600 mb-6 text-sm">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-primary font-medium hover:underline">Create one free</Link>
+        <Link href="/register" className="text-primary font-medium hover:underline">
+          Create one free
+        </Link>
       </p>
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
       )}
       <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4" noValidate>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            Email address
+          </label>
           <input
             {...loginForm.register('email')}
             id="email"
@@ -167,8 +181,12 @@ function LoginPageInner() {
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-            <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+              Forgot password?
+            </Link>
           </div>
           <div className="relative">
             <input
