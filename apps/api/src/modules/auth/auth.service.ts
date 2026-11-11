@@ -38,11 +38,13 @@ const logger = createLogger({ name: 'api:auth' });
 
 // ─── Argon2 Configuration ─────────────────────────────────────────────────────
 // These are deliberately strong — auth is a one-time operation per login
+const IS_SERVERLESS = process.env['VERCEL'] === '1';
+
 const ARGON2_OPTIONS: argon2.Options = {
   type: argon2.argon2id,
-  memoryCost: 65536,   // 64 MB
-  timeCost: 3,
-  parallelism: 4,
+  memoryCost: IS_SERVERLESS ? 16384 : 65536,   // 16MB on serverless, 64MB elsewhere
+  timeCost: IS_SERVERLESS ? 2 : 3,
+  parallelism: IS_SERVERLESS ? 1 : 4,
 };
 
 // ─── Auth Response Types ──────────────────────────────────────────────────────
