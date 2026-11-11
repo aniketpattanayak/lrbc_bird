@@ -27,6 +27,7 @@ RUN npm run build -w packages/types \
     && npm run build -w packages/config \
     && npm run build -w packages/crypto \
     && npm run build -w packages/logger \
+    && npm run build -w packages/database \
     && npm run build -w packages/redis \
     && npm run build -w packages/queue \
     && npm run build -w packages/meta-cloud-api \
