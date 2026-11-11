@@ -39,11 +39,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   const config = getConfig();
   const isDev = config.NODE_ENV === 'development';
 
+  const isVercel = process.env['VERCEL'] === '1';
+
   const app = Fastify({
     // Use our Pino logger
     logger: {
       level: config.LOG_LEVEL,
-      ...(isDev && {
+      // pino-pretty uses worker threads — skip on Vercel serverless
+      ...(!isVercel && isDev && {
         transport: {
           target: 'pino-pretty',
           options: {
@@ -59,7 +62,6 @@ export async function buildApp(): Promise<FastifyInstance> {
     // Attach request ID to every request for tracing
     genReqId: () => `req_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
     requestIdHeader: 'x-request-id',
-    // Close grace period: wait 30s for in-flight requests on shutdown
   });
 
   // ── Security Headers (Helmet) ──────────────────────────────────────────────
@@ -110,11 +112,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
-  await app.register(fastifyWebSocket, {
-    options: {
-      maxPayload: 1048576, // 1MB
-    },
-  });
+  // Skip on Vercel serverless — WebSocket upgrade is not supported there
+  if (!isVercel) {
+    await app.register(fastifyWebSocket, {
+      options: {
+        maxPayload: 1048576, // 1MB
+      },
+    });
+  }
 
   // ── Rate Limiting (global default) ────────────────────────────────────────
   await app.register(fastifyRateLimit, {
