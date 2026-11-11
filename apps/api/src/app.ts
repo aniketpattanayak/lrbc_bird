@@ -121,7 +121,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     global: true,
     max: 200, // Global default — overridden per route
     timeWindow: '1 minute',
-    redis: getRedis(),
+    ...(process.env['REDIS_URL'] ? { redis: getRedis() } : {}),
     keyGenerator: (request) => {
       // Rate limit by API key if present, otherwise by IP
       const apiKey = request.headers['x-api-key'];

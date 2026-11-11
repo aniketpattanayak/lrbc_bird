@@ -22,7 +22,8 @@ function buildRedisOptions(overrides?: Partial<RedisOptions>): RedisOptions {
   const defaultOptions: RedisOptions = {
     // Connection
     lazyConnect: true,
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: (process.env['VERCEL'] === '1') ? 1 : 3,
+    connectTimeout: (process.env['VERCEL'] === '1') ? 5000 : 10000,
     enableReadyCheck: true,
     password,
     // Reconnect strategy
