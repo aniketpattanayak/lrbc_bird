@@ -1,6 +1,6 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache dumb-init vips-dev python3 make g++
+RUN apk add --no-cache dumb-init vips-dev python3 make g++ openssl openssl-dev
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 FROM base AS deps
