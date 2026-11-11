@@ -26,6 +26,8 @@ function buildRedisOptions(overrides?: Partial<RedisOptions>): RedisOptions {
     connectTimeout: (process.env['VERCEL'] === '1') ? 5000 : 10000,
     enableReadyCheck: true,
     password,
+    // TLS for rediss:// URLs (Upstash, Redis Cloud, etc.)
+    ...(process.env['REDIS_URL']?.startsWith('rediss://') ? { tls: { rejectUnauthorized: false } } : {}),
     // Reconnect strategy
     retryStrategy(times) {
       if (times > 10) {
