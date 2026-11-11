@@ -2,7 +2,7 @@
   "name": "@wsaas/api",
   "version": "0.1.0",
   "private": true,
-  "main": "dist/index.js",
+  "main": "dist/app.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "admin": { "root": "apps/admin", "framework": "nextjs" },
-    "api": { "root": "apps/api", "framework": "nodejs" },
+    "api": { "root": "apps/api", "framework": "fastify" },
     "dashboard": { "root": "apps/dashboard", "framework": "nextjs" },
     "dispatcher": { "root": ".", "runtime": "container" },
     "landing": { "root": "apps/landing", "framework": "nextjs" },
