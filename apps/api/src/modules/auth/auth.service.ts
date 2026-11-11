@@ -150,7 +150,7 @@ export async function register(
 
     // Send verification email (fire and forget — don't block registration)
     const verificationUrl = `${config.APP_URL}/verify-email?token=${rawToken}`;
-    void sendVerificationEmail({
+    await sendVerificationEmail({
       to: dto.email,
       firstName: dto.firstName,
       verificationUrl,
@@ -218,7 +218,7 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
     logger.info({ userId: user.id, tenantId: user.tenantId }, 'Email verified');
 
     // Send welcome email
-    void sendWelcomeEmail({
+    await sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName,
     });
@@ -273,7 +273,7 @@ export async function resendVerification(email: string): Promise<void> {
   });
 
   const verificationUrl = `${config.APP_URL}/verify-email?token=${rawToken}`;
-  void sendVerificationEmail({
+  await sendVerificationEmail({
     to: email,
     firstName: user.firstName,
     verificationUrl,
@@ -665,7 +665,7 @@ export async function forgotPassword(email: string): Promise<void> {
   });
 
   const resetUrl = `${config.APP_URL}/reset-password?token=${rawToken}`;
-  void sendPasswordResetEmail({ to: email, firstName: user.firstName, resetUrl });
+  await sendPasswordResetEmail({ to: email, firstName: user.firstName, resetUrl });
 }
 
 // ─── RESET PASSWORD ───────────────────────────────────────────────────────────
