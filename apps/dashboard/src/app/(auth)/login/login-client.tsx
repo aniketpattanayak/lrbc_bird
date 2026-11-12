@@ -24,12 +24,11 @@ type LoginForm = z.infer<typeof loginSchema>;
 type TwoFaForm = z.infer<typeof twoFaSchema>;
 
 interface LoginResponse {
-  data: {
-    accessToken: string;
-    user: PublicUser;
-    tenant: PublicTenant;
-    twoFactorRequired?: boolean;
-  };
+  accessToken: string;
+  user: PublicUser;
+  tenant: PublicTenant;
+  requires2FA?: boolean;
+  twoFactorRequired?: boolean;
 }
 
 function LoginPageInner() {
@@ -60,12 +59,12 @@ function LoginPageInner() {
     setError(null);
     try {
       const res = await api.post<LoginResponse>('/v1/auth/login', data, { skipAuth: true });
-      if (res.data.twoFactorRequired) {
+      if (res.requires2FA || res.twoFactorRequired) {
         setPendingEmail(data.email);
         setPendingPassword(data.password);
         setTwoFaRequired(true);
       } else {
-        setAuth(res.data.user, res.data.tenant, res.data.accessToken);
+        setAuth(res.user, res.tenant, res.accessToken);
         router.replace(redirectTo);
       }
     } catch (err) {
@@ -88,7 +87,7 @@ function LoginPageInner() {
         { email: pendingEmail, password: pendingPassword, code: data.code },
         { skipAuth: true },
       );
-      setAuth(res.data.user, res.data.tenant, res.data.accessToken);
+      setAuth(res.user, res.tenant, res.accessToken);
       router.replace(redirectTo);
     } catch (err) {
       if (err instanceof ApiClientError) {
