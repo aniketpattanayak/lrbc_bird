@@ -53,8 +53,13 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.patch('/tenants/:tenantId', { preHandler }, async (request) => {
     const { tenantId } = request.params as any;
-    const { status } = request.body as any;
-    const data = await adminService.updateTenantStatus(tenantId, status, request.userId);
+    const { status, planId, limitOverrides, allowedTabs } = request.body as any;
+    // Legacy: if only status is passed, use old handler; otherwise use new unified one
+    if (status && !planId && !limitOverrides && !allowedTabs) {
+      const data = await adminService.updateTenantStatus(tenantId, status, request.userId);
+      return { success: true, requestId: request.id, data };
+    }
+    const data = await adminService.updateTenant(tenantId, { status, planId, limitOverrides, allowedTabs }, request.userId);
     return { success: true, requestId: request.id, data };
   });
 

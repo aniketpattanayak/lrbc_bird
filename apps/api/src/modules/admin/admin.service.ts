@@ -64,7 +64,7 @@ export async function getTenant(tenantId: string) {
   return { data: tenant };
 }
 
-// ─── Update Tenant Status ─────────────────────────────────────────────────────
+// ─── Update Tenant (status, plan, limits, tab access) ────────────────────────
 
 export async function updateTenantStatus(
   tenantId: string,
@@ -85,6 +85,64 @@ export async function updateTenantStatus(
   });
 
   logger.info({ tenantId, status, adminUserId }, 'Admin updated tenant status');
+  return { data: updated };
+}
+
+export async function updateTenant(
+  tenantId: string,
+  dto: {
+    status?: string;
+    planId?: string | null;
+    limitOverrides?: {
+      maxInstances?: number | null;
+      maxMessagesPerMonth?: number | null;
+      maxApiKeys?: number | null;
+    };
+    allowedTabs?: string[] | null;
+  },
+  adminUserId: string,
+) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) throw new NotFoundError('Tenant', tenantId);
+
+  const updateData: any = {};
+
+  if (dto.status) {
+    const validStatuses = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
+    if (!validStatuses.includes(dto.status)) {
+      throw new ValidationError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    updateData.status = dto.status;
+  }
+
+  if (dto.planId !== undefined) {
+    if (dto.planId) {
+      const plan = await prisma.plan.findUnique({ where: { id: dto.planId } });
+      if (!plan) throw new NotFoundError('Plan', dto.planId);
+    }
+    updateData.currentPlanId = dto.planId;
+  }
+
+  // Store limit overrides and tab access in metadata JSON field
+  if (dto.limitOverrides !== undefined || dto.allowedTabs !== undefined) {
+    const existingMeta = (tenant.metadata as Record<string, unknown>) ?? {};
+    const newMeta = { ...existingMeta };
+    if (dto.limitOverrides !== undefined) {
+      newMeta['limitOverrides'] = dto.limitOverrides;
+    }
+    if (dto.allowedTabs !== undefined) {
+      newMeta['allowedTabs'] = dto.allowedTabs;
+    }
+    updateData.metadata = newMeta;
+  }
+
+  const updated = await prisma.tenant.update({
+    where: { id: tenantId },
+    data: updateData,
+    include: { plan: true },
+  });
+
+  logger.info({ tenantId, dto, adminUserId }, 'Admin updated tenant');
   return { data: updated };
 }
 

@@ -171,43 +171,103 @@ function PlanModal({ plan, onClose, onSave }: { plan: Plan | null; onClose: () =
   );
 }
 
-function TenantDrawer({ tenantId, onClose, onStatusChange }: { tenantId: string; onClose: () => void; onStatusChange: () => void }) {
+const ALL_TABS = ['overview', 'instances', 'messages', 'templates', 'webhooks', 'api-keys', 'media', 'usage', 'wallet', 'billing', 'team'] as const;
+const TAB_LABELS: Record<string, string> = {
+  overview: 'Overview', instances: 'Instances', messages: 'Messages', templates: 'Templates',
+  webhooks: 'Webhooks', 'api-keys': 'API Keys', media: 'Media', usage: 'Usage',
+  wallet: 'Wallet', billing: 'Billing', team: 'Team',
+};
+
+function TenantDrawer({ tenantId, onClose, onStatusChange, plans }: { tenantId: string; onClose: () => void; onStatusChange: () => void; plans: Plan[] }) {
   const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [statusError, setStatusError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [drawerTab, setDrawerTab] = useState<'info' | 'controls'>('info');
+
+  // Editable fields
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [waMode, setWaMode] = useState('');
+  const [maxInstances, setMaxInstances] = useState('');
+  const [maxMessages, setMaxMessages] = useState('');
+  const [maxApiKeys, setMaxApiKeys] = useState('');
+  const [allowedTabs, setAllowedTabs] = useState<string[]>([...ALL_TABS]);
 
   useEffect(() => {
     api.get(`/v1/admin/tenants/${tenantId}`)
-      .then((r: any) => setTenant(r.data ?? r))
+      .then((r: any) => {
+        const t = r.data ?? r;
+        setTenant(t);
+        setSelectedPlanId(t.plan?.id ?? '');
+        setSelectedStatus(t.status ?? '');
+        setWaMode(t.whatsappMode ?? '');
+        const meta = t.metadata ?? {};
+        const lo = meta.limitOverrides ?? {};
+        setMaxInstances(lo.maxInstances != null ? String(lo.maxInstances) : '');
+        setMaxMessages(lo.maxMessagesPerMonth != null ? String(lo.maxMessagesPerMonth) : '');
+        setMaxApiKeys(lo.maxApiKeys != null ? String(lo.maxApiKeys) : '');
+        setAllowedTabs(meta.allowedTabs ?? [...ALL_TABS]);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [tenantId]);
 
-  async function changeStatus(status: string) {
-    setUpdating(true);
-    setStatusError('');
+  function toggleTab(tab: string) {
+    setAllowedTabs(prev => prev.includes(tab) ? prev.filter(t => t !== tab) : [...prev, tab]);
+  }
+
+  async function handleSave() {
+    setSaving(true); setError(''); setSuccess('');
     try {
-      await api.patch(`/v1/admin/tenants/${tenantId}`, { status });
-      onStatusChange(); onClose();
+      await api.patch(`/v1/admin/tenants/${tenantId}`, {
+        status: selectedStatus,
+        planId: selectedPlanId || null,
+        limitOverrides: {
+          maxInstances: maxInstances !== '' ? Number(maxInstances) : null,
+          maxMessagesPerMonth: maxMessages !== '' ? Number(maxMessages) : null,
+          maxApiKeys: maxApiKeys !== '' ? Number(maxApiKeys) : null,
+        },
+        allowedTabs: allowedTabs.length === ALL_TABS.length ? null : allowedTabs,
+      });
+      if (waMode && waMode !== tenant?.whatsappMode) {
+        await api.put(`/v1/admin/tenants/${tenantId}/whatsapp-mode`, { mode: waMode, force: true });
+      }
+      setSuccess('Saved successfully!');
+      onStatusChange();
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setStatusError(err instanceof ApiClientError ? err.message : 'Failed to update status');
-    } finally { setUpdating(false); }
+      setError(err instanceof ApiClientError ? err.message : 'Failed to save changes');
+    } finally { setSaving(false); }
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center sm:justify-end z-50">
-      <div className="bg-white w-full sm:w-[480px] h-full sm:h-full sm:rounded-l-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-white w-full sm:w-[520px] h-full sm:h-full sm:rounded-l-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-900">Tenant Detail</h2>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Manage Tenant</h2>
+            {tenant && <p className="text-xs text-gray-400">{tenant.companyName || tenant.name}</p>}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
+
+        {/* Drawer tabs */}
+        <div className="flex gap-1 px-6 pt-3 pb-0 border-b border-gray-100 flex-shrink-0">
+          {(['info', 'controls'] as const).map(t => (
+            <button key={t} onClick={() => setDrawerTab(t)} className={`px-3 py-2 text-sm font-medium capitalize border-b-2 transition-colors -mb-px ${drawerTab === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              {t === 'info' ? 'Info & Usage' : 'Controls'}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-100 animate-pulse rounded-lg" />)}</div>
           ) : !tenant ? (
             <p className="text-gray-500">Failed to load tenant</p>
-          ) : (
+          ) : drawerTab === 'info' ? (
             <div className="space-y-6">
               <div>
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Account Info</h3>
@@ -216,6 +276,7 @@ function TenantDrawer({ tenantId, onClose, onStatusChange }: { tenantId: string;
                   <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="font-medium text-gray-900">{tenant.email}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Status</span><StatusBadge status={tenant.status} /></div>
                   <div className="flex justify-between"><span className="text-gray-500">Plan</span><span className="font-medium text-gray-900">{tenant.plan?.displayName ?? 'None'}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">WA Mode</span><span className="font-medium text-gray-900">{tenant.whatsappMode ?? '—'}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Joined</span><span className="font-medium text-gray-900">{new Date(tenant.createdAt).toLocaleDateString()}</span></div>
                   {tenant.trialEndsAt && <div className="flex justify-between"><span className="text-gray-500">Trial ends</span><span className="font-medium text-gray-900">{new Date(tenant.trialEndsAt).toLocaleDateString()}</span></div>}
                 </div>
@@ -244,24 +305,94 @@ function TenantDrawer({ tenantId, onClose, onStatusChange }: { tenantId: string;
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Status */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Actions</h3>
-                {statusError && (
-                  <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
-                    <p className="text-xs text-red-700">{statusError}</p>
-                    <button onClick={() => setStatusError('')} className="text-red-500 hover:text-red-700 text-xs font-semibold">Dismiss</button>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Account Status</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {['ACTIVE', 'TRIAL', 'SUSPENDED', 'CANCELLED'].map(s => (
+                    <button key={s} type="button" onClick={() => setSelectedStatus(s)}
+                      className={`py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${selectedStatus === s ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Plan */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Assign Plan</h3>
+                <select value={selectedPlanId} onChange={e => setSelectedPlanId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                  <option value="">— No plan —</option>
+                  {plans.map(p => <option key={p.id} value={p.id}>{p.displayName} (${(p.priceMonthlyUsdCents / 100).toFixed(0)}/mo · {p.maxInstances} instances)</option>)}
+                </select>
+              </div>
+
+              {/* Limit Overrides */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Limit Overrides</h3>
+                <p className="text-xs text-gray-400 mb-3">Leave blank to use plan defaults.</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Instances</label>
+                    <input type="number" value={maxInstances} onChange={e => setMaxInstances(e.target.value)} placeholder="plan default" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                   </div>
-                )}
-                <div className="space-y-2">
-                  {tenant.status !== 'ACTIVE' && <button onClick={() => void changeStatus('ACTIVE')} disabled={updating} className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">Activate Account</button>}
-                  {tenant.status !== 'SUSPENDED' && <button onClick={() => void changeStatus('SUSPENDED')} disabled={updating} className="w-full py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">Suspend Account</button>}
-                  {tenant.status !== 'TRIAL' && <button onClick={() => void changeStatus('TRIAL')} disabled={updating} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">Move to Trial</button>}
-                  {tenant.status !== 'CANCELLED' && <button onClick={() => void changeStatus('CANCELLED')} disabled={updating} className="w-full py-2.5 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-semibold rounded-lg">Cancel Account</button>}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max Msgs/Month</label>
+                    <input type="number" value={maxMessages} onChange={e => setMaxMessages(e.target.value)} placeholder="plan default" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max API Keys</label>
+                    <input type="number" value={maxApiKeys} onChange={e => setMaxApiKeys(e.target.value)} placeholder="plan default" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tab Access */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Tab Access</h3>
+                <p className="text-xs text-gray-400 mb-3">Uncheck to hide a tab from this tenant's sidebar.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_TABS.map(tab => (
+                    <label key={tab} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 text-sm">
+                      <input type="checkbox" checked={allowedTabs.includes(tab)} onChange={() => toggleTab(tab)} className="w-4 h-4 text-indigo-600 rounded" />
+                      <span className="text-gray-700">{TAB_LABELS[tab]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* WhatsApp Mode */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">WhatsApp Mode</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {[{ val: '', label: 'Not set' }, { val: 'UNOFFICIAL', label: 'Unofficial (QR)' }, { val: 'OFFICIAL', label: 'Official (Meta)' }].map(opt => (
+                    <button key={opt.val} type="button" onClick={() => setWaMode(opt.val)}
+                      className={`py-2 px-2 rounded-lg text-xs font-semibold border-2 transition-colors ${waMode === opt.val ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Footer */}
+        {drawerTab === 'controls' && (
+          <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+            {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+            {success && <p className="text-xs text-green-600 mb-2">{success}</p>}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => void handleSave()} disabled={saving} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -481,7 +612,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {selectedTenantId && <TenantDrawer tenantId={selectedTenantId} onClose={() => setSelectedTenantId(null)} onStatusChange={() => void loadTenants()} />}
+      {selectedTenantId && <TenantDrawer tenantId={selectedTenantId} onClose={() => setSelectedTenantId(null)} onStatusChange={() => void loadTenants()} plans={plans} />}
       {planModal.open && <PlanModal plan={planModal.plan} onClose={() => setPlanModal({ open: false, plan: null })} onSave={() => void loadPlans()} />}
     </div>
   );
