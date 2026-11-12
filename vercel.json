@@ -30,6 +30,8 @@
     { "source": "/api-keys", "destination": { "service": "dashboard" } },
     { "source": "/usage", "destination": { "service": "dashboard" } },
     { "source": "/onboarding", "destination": { "service": "dashboard" } },
+    { "source": "/admin", "destination": { "service": "dashboard" } },
+    { "source": "/admin/:path*", "destination": { "service": "dashboard" } },
     { "source": "/_next/:path*", "destination": { "service": "dashboard" } },
     { "source": "/:path*", "destination": { "service": "landing" } }
   ]
