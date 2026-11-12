@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { setAccessToken } from '@/lib/api';
+import { setAccessToken, getAccessToken } from '@/lib/api';
 
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
 import { useAuthStore } from '@/store/authStore';
@@ -20,9 +20,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialized.current = true;
 
     void (async () => {
+      // If we already have a token in memory (e.g. just logged in this session),
+      // skip the refresh round-trip — the store already has user/tenant data.
+      const existingToken = getAccessToken();
+      const { isAuthenticated } = useAuthStore.getState();
+      if (existingToken && isAuthenticated) {
+        setLoading(false);
+        if (PUBLIC_ROUTES.has(pathname)) router.replace('/overview');
+        return;
+      }
+
       setLoading(true);
       try {
-        // Step 1: refresh to get new access token
+        // Get a fresh access token from the refresh cookie
         const refreshRes = await fetch(`${API_URL}/v1/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
@@ -38,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const token = refreshData.data?.accessToken as string;
         setAccessToken(token);
 
-        // Step 2: get user info with access token
+        // Fetch user + tenant info with the new token
         const meRes = await fetch(`${API_URL}/v1/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: 'include',
@@ -52,7 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const meData = await meRes.json();
         setAuth(meData.data.user, meData.data.tenant, token);
-        if (PUBLIC_ROUTES.has(pathname)) router.replace('/overview');
+
+        if (PUBLIC_ROUTES.has(pathname)) {
+          router.replace('/overview');
+        }
       } catch {
         clearAuth();
         if (!PUBLIC_ROUTES.has(pathname)) router.replace('/login');
