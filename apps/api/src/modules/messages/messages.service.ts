@@ -116,6 +116,7 @@ export interface ListMessagesFilters {
   instanceId?: string;
   type?: string;
   status?: string;
+  direction?: string;
   search?: string;
   from?: Date;
   to?: Date;
@@ -126,6 +127,7 @@ export async function listMessages(tenantId: string, filters: ListMessagesFilter
   if (filters.instanceId) where['instanceId'] = filters.instanceId;
   if (filters.type) where['type'] = filters.type;
   if (filters.status) where['status'] = filters.status;
+  if (filters.direction) where['direction'] = filters.direction;
   if (filters.from || filters.to) {
     where['createdAt'] = {
       ...(filters.from && { gte: filters.from }),

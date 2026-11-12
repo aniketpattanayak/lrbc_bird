@@ -156,6 +156,7 @@ export default function MessagesPage() {
   const [instanceFilter, setInstanceFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [directionFilter, setDirectionFilter] = useState('OUTBOUND');
   const [showSend, setShowSend] = useState(false);
   const [thread, setThread] = useState<{ instanceId: string; phone: string } | null>(null);
 
@@ -168,6 +169,7 @@ export default function MessagesPage() {
       if (instanceFilter) params.set('instanceId', instanceFilter);
       if (typeFilter) params.set('type', typeFilter);
       if (statusFilter) params.set('status', statusFilter);
+      if (directionFilter) params.set('direction', directionFilter);
       const res = await api.paginated<Message>(`/v1/messages?${params.toString()}`);
       if (res.success) { setMessages(res.data); setHasNext(res.meta.hasNext); }
       if (instances.length === 0) {
@@ -180,7 +182,7 @@ export default function MessagesPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, instanceFilter, typeFilter, statusFilter]);
+  }, [page, search, instanceFilter, typeFilter, statusFilter, directionFilter]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -189,7 +191,7 @@ export default function MessagesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-          <p className="text-sm text-gray-600 mt-0.5">Everything sent and received across your instances.</p>
+          <p className="text-sm text-gray-600 mt-0.5">Messages sent via API across your instances.</p>
         </div>
         <button type="button" onClick={() => setShowSend((v) => !v)} className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
           {showSend ? 'Close' : '+ Send message'}
@@ -211,6 +213,11 @@ export default function MessagesPage() {
         <select value={statusFilter} onChange={(e) => { setPage(1); setStatusFilter(e.target.value); }} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
           <option value="">All statuses</option>
           {Object.keys(STATUS_STYLES).map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={directionFilter} onChange={(e) => { setPage(1); setDirectionFilter(e.target.value); }} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="OUTBOUND">API sent only</option>
+          <option value="INBOUND">Received only</option>
+          <option value="">All messages</option>
         </select>
       </div>
 

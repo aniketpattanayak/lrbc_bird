@@ -262,6 +262,30 @@ function CreateInstanceModal({ onCreated, onClose, lockedMode }: { onCreated: (i
   );
 }
 
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+      title={`Copy ${label}`}
+    >
+      {copied ? (
+        <><span className="text-green-500">✓</span> <span className="text-green-500">Copied!</span></>
+      ) : (
+        <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Copy ID</>
+      )}
+    </button>
+  );
+}
+
 function InstanceCard({ instance, onShowQr, onDelete }: { instance: Instance; onShowQr: (i: Instance) => void; onDelete: (i: Instance) => void }) {
   const canShowQr = (instance as any).status !== 'CONNECTED' && (instance as any).status !== 'BANNED' && (instance as any).status !== 'DELETED';
   return (
@@ -273,9 +297,12 @@ function InstanceCard({ instance, onShowQr, onDelete }: { instance: Instance; on
         </div>
         <StatusBadge status={instance.status} />
       </div>
-      <div className="text-xs text-gray-400">
-        Created {new Date(instance.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        {instance.connectedAt && <> · Connected {new Date(instance.connectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>}
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-gray-400">
+          Created {new Date(instance.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {instance.connectedAt && <> · Connected {new Date(instance.connectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>}
+        </div>
+        <CopyButton text={instance.id} label="Instance ID" />
       </div>
       <div className="flex gap-2 pt-1 border-t border-gray-100">
         {canShowQr && (

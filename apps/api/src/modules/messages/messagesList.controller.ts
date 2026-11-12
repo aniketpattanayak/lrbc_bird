@@ -7,6 +7,7 @@ interface ListQuery {
   instanceId?: string;
   type?: string;
   status?: string;
+  direction?: string;
   search?: string;
   from?: string;
   to?: string;
@@ -23,6 +24,7 @@ export async function listMessagesController(request: FastifyRequest<{ Querystri
     instanceId: q.instanceId,
     type: q.type,
     status: q.status,
+    direction: q.direction,
     search: q.search,
     from: q.from ? new Date(q.from) : undefined,
     to: q.to ? new Date(q.to) : undefined,

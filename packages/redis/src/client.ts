@@ -51,7 +51,12 @@ function buildRedisOptions(overrides?: Partial<RedisOptions>): RedisOptions {
 
 export function createRedisClient(options?: Partial<RedisOptions>): Redis {
   const url = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
-  const client = new Redis(url, buildRedisOptions(options));
+  const opts = buildRedisOptions(options);
+  // On Vercel, force lazyConnect so hostname resolution doesn't happen at construction time
+  if (process.env['VERCEL'] === '1') {
+    opts.lazyConnect = true;
+  }
+  const client = new Redis(url, opts);
 
   client.on('connect', () => logger.info('Redis: connected'));
   client.on('ready', () => logger.info('Redis: ready'));
@@ -70,6 +75,8 @@ export function createRedisClient(options?: Partial<RedisOptions>): Redis {
 export function getRedis(): Redis {
   if (!redisInstance) {
     redisInstance = createRedisClient();
+    // On Vercel serverless, connect lazily only when first command runs
+    // Don't trigger connection at instantiation time
   }
   return redisInstance;
 }
